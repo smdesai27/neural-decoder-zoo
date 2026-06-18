@@ -1,0 +1,15 @@
+# Default experiment configuration (documentary; run.py uses CLI flags).
+dataset: synthetic        # synthetic | classification | mc_maze
+test_frac: 0.25           # contiguous held-out tail (no shuffle)
+
+decoders:
+  ridge_wiener: { alpha: 1.0, n_lags: 4 }
+  kalman: {}
+  mlp: { n_lags: 4, hidden: 128, epochs: 60 }     # requires torch
+  gru: { win: 12, hidden: 96, epochs: 40 }        # requires torch
+  tcn: { win: 12, hidden: 96, epochs: 40 }        # requires torch
+
+robustness:
+  channel_dropout_fracs: [0.0, 0.1, 0.25, 0.5, 0.75]
+  artifact_event_rate_hz: 1.0
+  artifact_amplitude: 50.0

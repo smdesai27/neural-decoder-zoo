@@ -1,0 +1,32 @@
+# --- data & outputs (never commit data; keeps the repo PHI-safe) ---
+# anchored to repo root so package source under src/ndz/data/ is NOT ignored
+/data/
+/results/
+/models/
+*.nwb
+*.h5
+*.hdf5
+*.npz
+*.npy
+*.ncs
+*.nev
+*.csv
+!configs/*.csv
+
+# --- python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# --- os/editor ---
+.DS_Store
+.idea/
+.vscode/
