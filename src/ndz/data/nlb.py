@@ -5,10 +5,13 @@ clean, citable brain-to-behavior benchmark on DANDI. This module is a thin,
 documented loader; the heavy deps (`dandi`, `pynwb`) are optional so the rest of
 the zoo runs without them. NO PHI — this is public, de-identified animal data.
 
-Download (once):
+Download (once) — the ~29 MB Small split is the quick path:
     pip install "neural-decoder-zoo[nlb]"
-    dandi download DANDI:000128/0.220113.0400   # MC_Maze
-then point --nwb-path at the downloaded .nwb file.
+    dandi download "DANDI:000140/sub-Jenkins/sub-Jenkins_ses-small_desc-train_behavior+ecephys.nwb"
+then point --nwb-path at the downloaded .nwb file. (Full set: DANDI:000128.)
+
+Verified against the NWB layout: spikes in `units.spike_times`; hand velocity in
+`processing['behavior'].data_interfaces['hand_vel']` (a 2-D TimeSeries).
 """
 
 from __future__ import annotations
@@ -30,15 +33,15 @@ def load_mc_maze(nwb_path: str | Path, bin_size_s: float = 0.020) -> NeuralDatas
     except ImportError as exc:  # pragma: no cover - optional path
         raise ImportError(
             "pynwb is required for the NLB loader. Install with "
-            "`pip install \"neural-decoder-zoo[nlb]\"` and download the dataset "
-            "via `dandi download DANDI:000128/0.220113.0400`."
+            "`pip install \"neural-decoder-zoo[nlb]\"` and download the dataset via "
+            "`dandi download \"DANDI:000140/sub-Jenkins/sub-Jenkins_ses-small_desc-train_behavior+ecephys.nwb\"`."
         ) from exc
 
     nwb_path = Path(nwb_path)
     if not nwb_path.exists():
         raise FileNotFoundError(
-            f"{nwb_path} not found. Download MC_Maze with "
-            "`dandi download DANDI:000128/0.220113.0400`."
+            f"{nwb_path} not found. Download MC_Maze_Small with "
+            "`dandi download \"DANDI:000140/sub-Jenkins/sub-Jenkins_ses-small_desc-train_behavior+ecephys.nwb\"`."
         )
 
     with NWBHDF5IO(str(nwb_path), "r") as io:

@@ -25,21 +25,33 @@ pip install -e ".[dev,torch]"
 python -m ndz.run --dataset synthetic
 ```
 
-## Example results (synthetic reach, 25% held-out tail)
+## Example results
 
-| decoder | R² | corr | latency (µs/sample) |
+Two datasets, identical code, 25% held-out **temporal** tail. Metrics: **R²** + **corr** (regression) and per-sample **inference latency** (µs).
+
+**Synthetic reach** (cosine-tuned population, no download):
+
+| decoder | R² | corr | latency (µs) |
 |---|---|---|---|
-| `ridge_wiener` | **0.948** | 0.974 | 124 |
-| `tcn` | 0.940 | 0.970 | 2817 |
-| `gru` | 0.922 | 0.963 | 363 |
-| `mlp` | 0.907 | 0.954 | 81 |
-| `kalman` | 0.795 | 0.966 | 23039 |
+| `ridge_wiener` | **0.95** | 0.97 | 124 |
+| `tcn` | 0.94 | 0.97 | 2817 |
+| `gru` | 0.92 | 0.96 | 363 |
+| `mlp` | 0.91 | 0.95 | 81 |
+| `kalman` | 0.80 | 0.97 | 23039 |
 
-_Regenerate with `make demo` (writes `results/results.csv` + `results/results.png`)._
+**MC_Maze** (real macaque M1/PMd → hand velocity; NLB, DANDI:000140):
 
-Metrics: **R²** and **corr** (regression), **accuracy** (classification), plus per-sample **inference latency**. The synthetic dataset has a genuine cosine-tuned population code, so baselines reach meaningful R² and richer models can be compared fairly.
+| decoder | R² | corr | latency (µs) |
+|---|---|---|---|
+| `tcn` | **0.51** | 0.76 | 2728 |
+| `gru` | 0.47 | 0.70 | 483 |
+| `mlp` | 0.25 | 0.65 | 128 |
+| `ridge_wiener` | 0.23 | 0.48 | 93 |
+| `kalman` | −0.02 | 0.38 | 21967 |
 
-> Note the well-regularized **linear baseline is hardest to beat** on this dataset — a deliberate, honest result. The point of the zoo is the comparison framework (held-out temporal generalization, latency, robustness), not a leaderboard win for the fanciest model. On real data like MC_Maze the sequence models earn their keep; here they don't, and saying so *is* the signal-validity discipline.
+**The contrast is the point.** On the synthetic data a well-regularized **linear** baseline wins; on real **MC_Maze** the **sequence models roughly double** the linear R² (0.51 vs 0.23). Fancy models earn their keep only when the data's temporal structure rewards them — and reporting *where they don't* (synthetic) is the same signal-validity discipline that makes the win on real data credible.
+
+_Regenerate: `make demo` (synthetic) or `python -m ndz.run --dataset mc_maze --nwb-path <file> --robustness` (after the NLB download below)._
 
 ## The decoder lineup
 
@@ -72,12 +84,14 @@ Every decoder implements the same `fit(X, Y) → predict(X)` interface (`ndz.dec
 ## Datasets
 
 - **Synthetic** (default) — cosine-tuned Poisson population encoding a smooth 2-D reach velocity. Decodable, deterministic by seed, zero downloads.
-- **MC_Maze (Neural Latents Benchmark)** — monkey motor/premotor spikes → hand velocity; public, de-identified animal data on DANDI:
+- **MC_Maze (Neural Latents Benchmark)** — macaque M1/PMd spikes → hand velocity; public, de-identified animal data on DANDI. The **Small** split (DANDI:000140, ~29 MB) is the quick path; the full set is DANDI:000128 (~0.7 GB).
   ```bash
   pip install -e ".[nlb]"
-  dandi download DANDI:000128/0.220113.0400
-  python -m ndz.run --dataset mc_maze --nwb-path <path-to>.nwb
+  # download the ~29 MB MC_Maze_Small train file (behavior+ecephys):
+  dandi download "DANDI:000140/sub-Jenkins/sub-Jenkins_ses-small_desc-train_behavior+ecephys.nwb"
+  python -m ndz.run --dataset mc_maze --nwb-path sub-Jenkins_ses-small_desc-train_behavior+ecephys.nwb
   ```
+  Results above were produced with this file (14,683 bins × 142 units, 20 ms bins).
 
 ## Repository structure
 
@@ -95,7 +109,7 @@ configs/       default experiment config
 
 ## Roadmap
 
-- [ ] Wire MC_Maze numbers alongside synthetic in the results table
+- [x] Wire MC_Maze numbers alongside synthetic in the results table
 - [ ] Add a latent-dynamics baseline (e.g. reduced-rank / LFADS-lite) above the sequence models
 - [ ] Calibration-efficiency curve (R² vs minutes of training data)
 - [ ] Closed-loop-style online evaluation harness (causal, fixed-latency)
