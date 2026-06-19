@@ -21,9 +21,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from .data import load_dataset
-from .decoders import HAS_TORCH, build_decoders
+from .decoders import HAS_TORCH, build_decoders, decoder_factories
 from .decoders.linear import RidgeDecoder
-from .evaluate import evaluate_decoder, temporal_split
+from .evaluate import blocked_cv, evaluate_decoder, temporal_split
+from .experiments import calibration_curve, cursor_simulation, nonstationarity_curve
 from .metrics import r2_score
 from .robustness import channel_dropout, inject_stim_artifact, naive_activity_score
 
@@ -117,6 +118,90 @@ def run_robustness(dataset: str, test_frac: float, out_dir: Path, **load_kwargs)
     print(f"wrote {out_dir/'robustness.png'}")
 
 
+def run_cv(dataset, task, n_folds, no_torch, out_dir, **load_kwargs):
+    """Blocked k-fold CV across all decoders -> table + bar chart with error bars."""
+    ds = load_dataset(dataset, **load_kwargs)
+    task = task or ds.task
+    key = "accuracy" if task == "classification" else "r2"
+    rows = []
+    for name, fac in decoder_factories(task=task, include_torch=not no_torch):
+        agg, _ = blocked_cv(fac, ds, n_folds=n_folds)
+        rows.append({"decoder": name, f"{key}_mean": agg[f"{key}_mean"], f"{key}_std": agg[f"{key}_std"]})
+    rows.sort(key=lambda r: r[f"{key}_mean"], reverse=True)
+    print(f"\n{ds.name}: {n_folds}-fold blocked CV (mean +/- std)")
+    _print_table(rows)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    fig, ax = plt.subplots(figsize=(7.5, 4.4))
+    ax.bar([r["decoder"] for r in rows], [r[f"{key}_mean"] for r in rows],
+           yerr=[r[f"{key}_std"] for r in rows], capsize=4, color="#3182bd")
+    ax.set_ylabel(f"{key} (mean +/- std)")
+    ax.set_title(f"{ds.name}: cross-validated decoder comparison ({n_folds}-fold blocked)")
+    ax.tick_params(axis="x", rotation=30)
+    fig.tight_layout(); fig.savefig(out_dir / "cv.png", dpi=130); plt.close(fig)
+    print(f"wrote {out_dir/'cv.png'}")
+    return rows
+
+
+def _reg_factories(no_torch):
+    return dict(decoder_factories(task="regression", include_torch=not no_torch))
+
+
+def run_calibration(dataset, no_torch, out_dir, **load_kwargs):
+    ds = load_dataset(dataset, **load_kwargs)
+    facs = _reg_factories(no_torch)
+    models = ["ridge_wiener"] + (["gru"] if "gru" in facs else [])
+    print("\n--- Calibration efficiency (R2 vs minutes of training data) ---")
+    fig, ax = plt.subplots(figsize=(7, 4.3))
+    for name in models:
+        rows = calibration_curve(facs[name], ds)
+        ax.plot([r["minutes"] for r in rows], [r["r2"] for r in rows], "o-", label=name)
+        print(name, {r["minutes"]: r["r2"] for r in rows})
+    ax.set_xlabel("minutes of calibration data"); ax.set_ylabel("R2 on held-out tail")
+    ax.set_xscale("log"); ax.set_title(f"{ds.name}: calibration efficiency"); ax.legend(fontsize=8)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    fig.tight_layout(); fig.savefig(out_dir / "calibration.png", dpi=130); plt.close(fig)
+    print(f"wrote {out_dir/'calibration.png'}")
+
+
+def run_nonstationarity(dataset, no_torch, out_dir, **load_kwargs):
+    ds = load_dataset(dataset, **load_kwargs)
+    facs = _reg_factories(no_torch)
+    models = ["ridge_wiener"] + (["gru"] if "gru" in facs else [])
+    print("\n--- Nonstationarity (R2 decay after calibration) ---")
+    fig, ax = plt.subplots(figsize=(7, 4.3))
+    for name in models:
+        rows = nonstationarity_curve(facs[name], ds)
+        ax.plot([r["minutes_after_calib"] for r in rows], [r["r2"] for r in rows], "o-", label=name)
+        print(name, [(r["minutes_after_calib"], r["r2"]) for r in rows])
+    ax.set_xlabel("minutes after calibration"); ax.set_ylabel("R2")
+    ax.set_title(f"{ds.name}: performance decay over time"); ax.legend(fontsize=8)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    fig.tight_layout(); fig.savefig(out_dir / "nonstationarity.png", dpi=130); plt.close(fig)
+    print(f"wrote {out_dir/'nonstationarity.png'}")
+
+
+def run_cursor(dataset, no_torch, out_dir, **load_kwargs):
+    ds = load_dataset(dataset, **load_kwargs)
+    facs = _reg_factories(no_torch)
+    name = "gru" if "gru" in facs else "ridge_wiener"
+    sim = cursor_simulation(facs[name](), ds)
+    print("\n--- Cursor simulation (open-loop trajectory reconstruction) ---")
+    print(f"decoder={name} vel_r2={sim['vel_r2']} normalized_drift={sim['normalized_drift']:.2f}")
+    import numpy as _np
+    n = min(600, len(sim["pos_true"]))
+    fig, ax = plt.subplots(1, 2, figsize=(12, 4.6))
+    ax[0].plot(sim["pos_true"][:n, 0], sim["pos_true"][:n, 1], color="k", lw=1.2, label="true path")
+    ax[0].plot(sim["pos_pred"][:n, 0], sim["pos_pred"][:n, 1], color="#e6550d", lw=1.0, alpha=0.85, label=f"{name} decoded")
+    ax[0].set_title("Integrated cursor path (true vs decoded)"); ax[0].legend(fontsize=8)
+    ax[0].set_aspect("equal", "datalim")
+    tmin = _np.arange(len(sim["pos_err"])) * ds.bin_size_s / 60
+    ax[1].plot(tmin, sim["pos_err"], color="#3182bd")
+    ax[1].set_xlabel("minutes"); ax[1].set_ylabel("position drift"); ax[1].set_title("Cursor drift over time")
+    out_dir.mkdir(parents=True, exist_ok=True)
+    fig.tight_layout(); fig.savefig(out_dir / "cursor.png", dpi=130); plt.close(fig)
+    print(f"wrote {out_dir/'cursor.png'}")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--dataset", default="synthetic")
@@ -124,6 +209,12 @@ def main() -> None:
     ap.add_argument("--test-frac", type=float, default=0.25)
     ap.add_argument("--no-torch", action="store_true", help="linear + Kalman only")
     ap.add_argument("--robustness", action="store_true", help="run robustness + signal-validity demo")
+    ap.add_argument("--cv", action="store_true", help="blocked k-fold cross-validation with error bars")
+    ap.add_argument("--n-folds", type=int, default=5)
+    ap.add_argument("--calibration", action="store_true", help="R2 vs minutes of training data")
+    ap.add_argument("--nonstationarity", action="store_true", help="R2 decay after calibration")
+    ap.add_argument("--cursor", action="store_true", help="open-loop cursor trajectory simulation")
+    ap.add_argument("--skip-zoo", action="store_true", help="skip the default decoder table")
     ap.add_argument("--nwb-path", default=None, help="path to a downloaded NWB file (real datasets)")
     ap.add_argument("--out", type=Path, default=Path("results"))
     args = ap.parse_args()
@@ -133,9 +224,18 @@ def main() -> None:
               "(install with `pip install -e \".[torch]\"` for the full zoo).")
 
     load_kwargs = {"nwb_path": args.nwb_path} if args.nwb_path else {}
-    run_zoo(args.dataset, args.task, args.test_frac, args.no_torch, args.out, **load_kwargs)
+    if not args.skip_zoo:
+        run_zoo(args.dataset, args.task, args.test_frac, args.no_torch, args.out, **load_kwargs)
     if args.robustness:
         run_robustness(args.dataset, args.test_frac, args.out, **load_kwargs)
+    if args.cv:
+        run_cv(args.dataset, args.task, args.n_folds, args.no_torch, args.out, **load_kwargs)
+    if args.calibration:
+        run_calibration(args.dataset, args.no_torch, args.out, **load_kwargs)
+    if args.nonstationarity:
+        run_nonstationarity(args.dataset, args.no_torch, args.out, **load_kwargs)
+    if args.cursor:
+        run_cursor(args.dataset, args.no_torch, args.out, **load_kwargs)
 
 
 if __name__ == "__main__":

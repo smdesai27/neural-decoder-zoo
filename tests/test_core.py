@@ -68,3 +68,37 @@ def test_artifact_inflates_magnitude_metric():
     clean = naive_activity_score(ds.X)
     art = naive_activity_score(inject_stim_artifact(ds.X, bin_size_s=ds.bin_size_s, amplitude=80.0))
     assert art > clean  # the fragile metric is fooled by artifact
+
+
+def test_blocked_cv_gives_error_bars():
+    from ndz.evaluate import blocked_cv
+    ds = make_reach_dataset(n_timepoints=2500, seed=5)
+    agg, folds = blocked_cv(RidgeDecoder, ds, n_folds=4)
+    assert len(folds) == 4
+    assert "r2_mean" in agg and "r2_std" in agg
+    assert agg["r2_mean"] > 0.2 and agg["r2_std"] >= 0.0
+
+
+def test_deployment_experiments_run():
+    from ndz.experiments import calibration_curve, cursor_simulation, nonstationarity_curve
+    ds = make_reach_dataset(n_timepoints=3000, seed=6)
+    assert calibration_curve(RidgeDecoder, ds, minutes=(0.2, 0.5))
+    assert nonstationarity_curve(RidgeDecoder, ds, n_windows=4)
+    sim = cursor_simulation(RidgeDecoder(), ds)
+    assert sim["pos_pred"].shape == sim["pos_true"].shape
+    assert "vel_r2" in sim
+
+
+def test_reduced_rank_decodes():
+    from ndz.decoders.latent import ReducedRankDecoder
+    ds = make_reach_dataset(n_timepoints=2500, seed=7)
+    res = evaluate_decoder(ReducedRankDecoder(n_components=10), ds, measure_latency=False)
+    assert res["r2"] > 0.2
+
+
+def test_transformer_runs_if_torch():
+    pytest.importorskip("torch")
+    from ndz.decoders.transformer import TransformerDecoder
+    ds = make_reach_dataset(n_timepoints=1200, n_channels=30, seed=8)
+    res = evaluate_decoder(TransformerDecoder(epochs=2, hidden=32, heads=4, layers=1), ds, measure_latency=False)
+    assert "r2" in res

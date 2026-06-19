@@ -19,12 +19,15 @@ except ImportError:
 def build_decoders(task: str = "regression", include_torch: bool = True) -> list[Decoder]:
     """Default decoder lineup for a task, in increasing complexity."""
     if task == "regression":
-        zoo: list[Decoder] = [RidgeDecoder(), KalmanDecoder()]
+        from .latent import ReducedRankDecoder
+
+        zoo: list[Decoder] = [RidgeDecoder(), KalmanDecoder(), ReducedRankDecoder()]
         if include_torch and HAS_TORCH:
             from .mlp import MLPDecoder
             from .sequence import GRUDecoder, TCNDecoder
+            from .transformer import TransformerDecoder
 
-            zoo += [MLPDecoder(), TCNDecoder(), GRUDecoder()]
+            zoo += [MLPDecoder(), TCNDecoder(), GRUDecoder(), TransformerDecoder()]
         return zoo
     if task == "classification":
         zoo = [LogisticDecoder()]
@@ -33,4 +36,30 @@ def build_decoders(task: str = "regression", include_torch: bool = True) -> list
 
             zoo += [MLPDecoder()]
         return zoo
+    raise ValueError(f"unknown task {task!r}")
+
+
+def decoder_factories(task: str = "regression", include_torch: bool = True):
+    """(name, zero-arg factory) pairs — needed where each run wants a fresh model
+    (e.g. cross-validation refits per fold)."""
+    if task == "regression":
+        from .latent import ReducedRankDecoder
+
+        facs = [("ridge_wiener", RidgeDecoder), ("kalman", KalmanDecoder),
+                ("reduced_rank", ReducedRankDecoder)]
+        if include_torch and HAS_TORCH:
+            from .mlp import MLPDecoder
+            from .sequence import GRUDecoder, TCNDecoder
+            from .transformer import TransformerDecoder
+
+            facs += [("mlp", MLPDecoder), ("tcn", TCNDecoder), ("gru", GRUDecoder),
+                     ("transformer", TransformerDecoder)]
+        return facs
+    if task == "classification":
+        facs = [("logistic", LogisticDecoder)]
+        if include_torch and HAS_TORCH:
+            from .mlp import MLPDecoder
+
+            facs.append(("mlp", MLPDecoder))
+        return facs
     raise ValueError(f"unknown task {task!r}")
