@@ -50,7 +50,7 @@ Two datasets, identical code, 25% held-out **temporal** tail. Metrics: **R²** +
 | `reduced_rank` | 0.17 | 0.41 | 148 |
 | `kalman` | −0.02 | 0.38 | 26556 |
 
-On clean synthetic data the linear family wins (reduced-rank and ridge top the table, the neural nets add nothing). On real MC_Maze the sequence models (transformer, TCN, GRU) roughly double to triple the linear baseline. The transformer edged ahead on this single split, but the cross-validated error bars below show how close the top sequence models actually are, which is exactly why you don't trust a single-split ranking.
+On clean synthetic data the linear family wins (reduced-rank and ridge top the table, the neural nets add nothing). On real MC_Maze the sequence models (transformer, TCN, GRU) roughly double to triple the linear baseline. The transformer leads on both the single split and cross-validation, but its margin over TCN sits inside the error bars — at the top they're effectively tied, which is the kind of call you can only make with cross-validation, not a single split.
 
 _Regenerate: `make demo` (synthetic) or `python -m ndz.run --dataset mc_maze --nwb-path <file> --cv --robustness` (after the NLB download below)._
 
@@ -90,7 +90,7 @@ The lesson, learned the hard way on real stimulation data: validate against beha
 
 Beyond a single accuracy number, the zoo probes what a real BCI actually cares about.
 
-**Cross-validated comparison (error bars).** 5-fold blocked CV with an embargo gap, across the core models. Averaged over folds, **TCN is the robust leader** — a useful counter to the single-split table above, where the transformer happened to nudge ahead. That gap between a single split and the cross-validated ranking is the whole point of showing error bars. (Cross-validating the two newest rungs, transformer and reduced-rank, is a quick follow-up.)
+**Cross-validated comparison (error bars).** 3-fold blocked CV with an embargo gap, all seven models. The transformer and TCN top it with **overlapping error bars** (≈0.57 vs ≈0.55) — effectively tied — while the linear models sit well below. The error bars are the point: they let you say "tied" rather than crowning whatever happened to win a single split.
 
 ![cross-validated decoder comparison](docs/cv_mc_maze.png)
 
