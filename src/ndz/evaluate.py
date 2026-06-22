@@ -1,8 +1,8 @@
-"""Evaluation harness — contiguous temporal splits (no leakage).
+"""Evaluation harness with contiguous temporal splits.
 
 Neural time series are autocorrelated, so a shuffled split leaks the future into
 training and inflates scores. We always train on an earlier contiguous block and
-test on a later one — the honest analogue of calibrate-then-use in a real BCI.
+test on a later one.
 """
 
 from __future__ import annotations

@@ -3,9 +3,9 @@
 MC_Maze (monkey primary motor / premotor cortex spikes -> hand kinematics) is a
 clean, citable brain-to-behavior benchmark on DANDI. This module is a thin,
 documented loader; the heavy deps (`dandi`, `pynwb`) are optional so the rest of
-the zoo runs without them. NO PHI — this is public, de-identified animal data.
+the zoo runs without them. No PHI. This is public animal data.
 
-Download (once) — the ~29 MB Small split is the quick path:
+Download once. The ~29 MB Small split is the quick path:
     pip install "neural-decoder-zoo[nlb]"
     dandi download "DANDI:000140/sub-Jenkins/sub-Jenkins_ses-small_desc-train_behavior+ecephys.nwb"
 then point --nwb-path at the downloaded .nwb file. (Full set: DANDI:000128.)

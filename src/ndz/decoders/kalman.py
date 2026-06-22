@@ -1,9 +1,9 @@
-"""Kalman-filter decoder (Wu et al. 2006 style) — numpy only.
+"""Kalman-filter decoder (Wu et al. 2006 style).
 
 A linear Gaussian state-space model where the latent state is the behavior
 (e.g. hand velocity) and observations are the neural population. Parameters are
 fit in closed form by least squares; decoding is the standard predict/update
-recursion. The canonical online intracortical-BCI decoder.
+recursion.
 """
 
 from __future__ import annotations
@@ -23,11 +23,11 @@ class KalmanDecoder(Decoder):
         Z = ((X - self._xmu) / self._xsd).T  # (C, T) observations
         S = Y.T.astype(np.float64)           # (D, T) states
         S1, S2 = S[:, :-1], S[:, 1:]
-        # state transition  x_t = A x_{t-1} + w,  w ~ N(0, W)
+        # State transition: x_t = A x_{t-1} + w, w ~ N(0, W).
         self.A = S2 @ S1.T @ np.linalg.pinv(S1 @ S1.T)
         rW = S2 - self.A @ S1
         self.W = rW @ rW.T / max(S.shape[1] - 1, 1)
-        # observation  z_t = C x_t + q,  q ~ N(0, Q)
+        # Observation: z_t = C x_t + q, q ~ N(0, Q).
         self.C = Z @ S.T @ np.linalg.pinv(S @ S.T)
         rQ = Z - self.C @ S
         self.Q = rQ @ rQ.T / S.shape[1]

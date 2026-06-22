@@ -4,9 +4,18 @@ from __future__ import annotations
 
 from .base import Decoder
 from .kalman import KalmanDecoder
+from .latent import ReducedRankDecoder
 from .linear import LogisticDecoder, RidgeDecoder
 
-__all__ = ["Decoder", "RidgeDecoder", "LogisticDecoder", "KalmanDecoder", "build_decoders", "HAS_TORCH"]
+__all__ = [
+    "Decoder",
+    "RidgeDecoder",
+    "LogisticDecoder",
+    "KalmanDecoder",
+    "ReducedRankDecoder",
+    "build_decoders",
+    "HAS_TORCH",
+]
 
 try:
     import torch  # noqa: F401
@@ -19,8 +28,6 @@ except ImportError:
 def build_decoders(task: str = "regression", include_torch: bool = True) -> list[Decoder]:
     """Default decoder lineup for a task, in increasing complexity."""
     if task == "regression":
-        from .latent import ReducedRankDecoder
-
         zoo: list[Decoder] = [RidgeDecoder(), KalmanDecoder(), ReducedRankDecoder()]
         if include_torch and HAS_TORCH:
             from .mlp import MLPDecoder
@@ -40,11 +47,8 @@ def build_decoders(task: str = "regression", include_torch: bool = True) -> list
 
 
 def decoder_factories(task: str = "regression", include_torch: bool = True):
-    """(name, zero-arg factory) pairs — needed where each run wants a fresh model
-    (e.g. cross-validation refits per fold)."""
+    """Return (name, zero-arg factory) pairs for repeated refits."""
     if task == "regression":
-        from .latent import ReducedRankDecoder
-
         facs = [("ridge_wiener", RidgeDecoder), ("kalman", KalmanDecoder),
                 ("reduced_rank", ReducedRankDecoder)]
         if include_torch and HAS_TORCH:

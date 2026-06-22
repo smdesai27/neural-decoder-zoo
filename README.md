@@ -3,9 +3,15 @@
 
 ![python](https://img.shields.io/badge/python-3.10%2B-blue) ![license](https://img.shields.io/badge/license-MIT-green) ![tests](https://img.shields.io/badge/tests-pytest-informational)
 
-A ladder of neural decoders, built for learning: a ridge/Wiener filter, a Kalman filter, a reduced-rank latent decoder, and MLP / TCN / GRU / transformer sequence models. Evaluated by held-out **temporal** generalization, **inference latency**, **robustness to channel loss**, calibration efficiency, and **signal validity**.
+Neural Decoder Zoo benchmarks brain-to-behavior decoders on synthetic motor data and public NLB MC_Maze intracortical recordings.
 
-It runs end-to-end on a synthetic motor-decoding dataset, and plugs into the public **Neural Latents Benchmark (MC_Maze)** for real intracortical data.
+It compares ridge/Wiener, Kalman, reduced-rank, MLP, TCN, GRU, and causal transformer decoders with temporal splits, blocked cross-validation, latency, calibration-efficiency, nonstationarity, channel-dropout, and artifact-validity checks.
+
+Headline results:
+
+- MC_Maze: transformer R² 0.57, TCN R² 0.51, ridge/Wiener R² 0.23.
+- Synthetic reach: reduced-rank and ridge/Wiener reach R² 0.95; sequence models do not improve the result.
+- Artifact check: a magnitude metric increases under injected stimulation-like artifact, while behavior-tied R² drops.
 
 ---
 
@@ -17,10 +23,14 @@ python -m ndz.run --dataset synthetic            # run the zoo, print a table, s
 python -m ndz.run --dataset synthetic --robustness   # + channel-dropout + signal-validity demo
 pytest -q                        # tests (no torch required)
 
-# full model zoo (adds MLP / GRU / TCN):
+# full model zoo (adds MLP / TCN / GRU / transformer):
 pip install -e ".[dev,torch]"
 python -m ndz.run --dataset synthetic
 ```
+
+## Why this repo exists
+
+This is a compact, reproducible benchmark for the kinds of tradeoffs that matter in brain-computer-interface decoding: simple baselines, sequence models, temporal generalization, calibration burden, latency, robustness, and artifact-aware validation. It is designed to run quickly from a fresh clone while still connecting to a public intracortical dataset.
 
 ## Example results
 
@@ -50,7 +60,7 @@ Two datasets, identical code, 25% held-out **temporal** tail. Metrics: **R²** +
 | `reduced_rank` | 0.17 | 0.41 | 148 |
 | `kalman` | −0.02 | 0.38 | 26556 |
 
-On clean synthetic data the linear family wins (reduced-rank and ridge top the table, the neural nets add nothing). On real MC_Maze the sequence models (transformer, TCN, GRU) roughly double to triple the linear baseline. The transformer leads on both the single split and cross-validation, but its margin over TCN sits inside the error bars — at the top they're effectively tied, which is the kind of call you can only make with cross-validation, not a single split.
+The synthetic dataset is close to linear. Reduced-rank and ridge/Wiener are the top models. MC_Maze has stronger temporal structure. Sequence models roughly double to triple the ridge/Wiener baseline. The transformer leads the single split and cross-validation, but the transformer and TCN error bars overlap.
 
 _Regenerate: `make demo` (synthetic) or `python -m ndz.run --dataset mc_maze --nwb-path <file> --cv --robustness` (after the NLB download below)._
 
@@ -58,58 +68,58 @@ _Regenerate: `make demo` (synthetic) or `python -m ndz.run --dataset mc_maze --n
 
 | Decoder | Family | Notes |
 |---|---|---|
-| `ridge_wiener` | Linear | Ridge-regularized Wiener filter with spike-history lags — the baseline to beat |
-| `kalman` | Linear-Gaussian state space | Wu et al.–style kinematic Kalman filter; the classic online BCI decoder |
-| `reduced_rank` | Linear, latent | PCA the population to a low-dim neural manifold, then ridge from it; cheap cousin of LFADS |
+| `ridge_wiener` | Linear | Ridge-regularized Wiener filter with spike-history lags |
+| `kalman` | Linear-Gaussian state space | Wu et al. style kinematic Kalman filter |
+| `reduced_rank` | Linear, latent | PCA population projection followed by ridge regression |
 | `mlp` | Feedforward NN | Windowed spike history → MLP *(torch)* |
 | `tcn` | Temporal conv net | Dilated causal convolutions over the population *(torch)* |
 | `gru` | Recurrent | GRU over a causal window; captures temporal dynamics *(torch)* |
-| `transformer` | Causal self-attention | Small causal transformer over the window; data-hungry, shines at scale not on one session *(torch)* |
+| `transformer` | Causal self-attention | Small causal transformer over the window *(torch)* |
 
 Every decoder implements the same `fit(X, Y) → predict(X)` interface (`ndz.decoders.base.Decoder`), so adding one is a single file.
 
 ## Evaluation methodology
 
-- **Contiguous temporal split, no shuffling.** Train on the earlier block, test on the later one. Neural time series are autocorrelated, so a shuffled split leaks the future into training and inflates the score; a temporal split is the honest analogue of calibrate-then-use. Error bars come from blocked k-fold CV with an embargo gap.
-- **BCI-relevant metrics, not just accuracy:** R² / correlation, plus per-sample **inference latency** (µs), **channel-dropout robustness**, calibration efficiency, and stability over time.
+- **Contiguous temporal split, no shuffling.** Train on the earlier block, test on the later one. Neural time series are autocorrelated, so a shuffled split leaks the future into training and inflates the score. Error bars come from blocked k-fold CV with an embargo gap.
+- **BCI metrics:** R² / correlation, per-sample inference latency, channel-dropout degradation, calibration efficiency, and stability over time.
 
-## Robustness & signal validity (the differentiating part)
+## Robustness and Signal Validity
 
 `python -m ndz.run --robustness` runs two probes:
 
-1. **Channel dropout** — decode quality as a function of % electrodes lost (graceful degradation matters for a chronic implant).
-2. **Signal-validity demo** — inject periodic saturating "stim-like" artifact into the held-out features, then judge "is there signal here?" two ways:
-   - a tempting **magnitude metric** (peak deflection) — the artifact inflates it ~35× on real data
-   - a **behavior-tied metric** (R² against true kinematics) — the artifact does not inflate it; it drops
+1. **Channel dropout:** decode quality as a function of electrodes removed.
+2. **Artifact validity:** inject periodic saturating stimulation-like artifact into held-out features, then compare two measurements:
+   - magnitude metric: peak deflection
+   - behavior-tied metric: R² against true kinematics
 
-The lesson, learned the hard way on real stimulation data: validate against behavior, not signal size. A metric that rewards raw response magnitude will happily "discover" artifact.
+The artifact increases the magnitude metric. It does not improve behavior-tied R². Use behavior-linked validation for neural-decoding claims.
 
 ![signal-validity demo: artifact inflates a magnitude metric but not behavior-tied R²](docs/signal_validity_mc_maze.png)
 
-## Rigor & deployment
+## Additional Evaluations
 
-Beyond a single accuracy number, the zoo probes what a real BCI actually cares about.
+The repository includes four additional BCI-oriented checks.
 
-**Cross-validated comparison (error bars).** 3-fold blocked CV with an embargo gap, all seven models. The transformer and TCN top it with **overlapping error bars** (≈0.57 vs ≈0.55) — effectively tied — while the linear models sit well below. The error bars are the point: they let you say "tied" rather than crowning whatever happened to win a single split.
+**Cross-validated comparison.** 3-fold blocked CV with an embargo gap, all seven models. Transformer and TCN are the top models. Their error bars overlap. Linear models are lower.
 
 ![cross-validated decoder comparison](docs/cv_mc_maze.png)
 
-**Calibration efficiency.** R² on a fixed held-out block vs minutes of training data. The GRU reaches usable accuracy with far less calibration than the linear model needs — the calibration burden is one of the biggest real-world BCI constraints (`--calibration`).
+**Calibration efficiency.** R² on a fixed held-out block vs minutes of training data. GRU reaches usable accuracy with less calibration data than ridge/Wiener (`--calibration`).
 
 ![calibration efficiency](docs/calibration_mc_maze.png)
 
-**Nonstationarity.** R² in successive windows after calibration — the drift a chronic decoder has to fight (`--nonstationarity`).
+**Nonstationarity.** R² in successive windows after calibration (`--nonstationarity`).
 
 ![performance decay over time](docs/nonstationarity_mc_maze.png)
 
-**Open-loop cursor.** Integrate the decoded velocity into a 2-D cursor path. Even at R²≈0.47 the path drifts away over time (normalized drift ~1.9), which is exactly why real BCIs run closed-loop with the user correcting in real time (`--cursor`).
+**Open-loop cursor.** Integrate decoded velocity into a 2-D cursor path. At R²≈0.47, the path drifts over time (normalized drift ~1.9). This is an offline trajectory check, not a closed-loop evaluation (`--cursor`).
 
 ![open-loop cursor trajectory](docs/cursor_mc_maze.png)
 
 ## Datasets
 
-- **Synthetic**  — cosine-tuned Poisson population encoding a smooth 2-D reach velocity. Decodable, deterministic by seed.
-- **MC_Maze (Neural Latents Benchmark)** — macaque M1/PMd spikes → hand velocity; public, de-identified animal data on DANDI. The **Small** split (DANDI:000140, ~29 MB) is the quick path; the full set is DANDI:000128 (~0.7 GB).
+- **Synthetic:** cosine-tuned Poisson population encoding a smooth 2-D reach velocity. Decodable, deterministic by seed.
+- **MC_Maze (Neural Latents Benchmark):** macaque M1/PMd spikes → hand velocity; public, de-identified animal data on DANDI. The **Small** split (DANDI:000140, ~29 MB) is the quick path; the full set is DANDI:000128 (~0.7 GB).
   ```bash
   pip install -e ".[nlb]"
   # download the ~29 MB MC_Maze_Small train file (behavior+ecephys):
@@ -117,6 +127,13 @@ Beyond a single accuracy number, the zoo probes what a real BCI actually cares a
   python -m ndz.run --dataset mc_maze --nwb-path sub-Jenkins_ses-small_desc-train_behavior+ecephys.nwb
   ```
   Results above were produced with this file (14,683 bins × 142 units, 20 ms bins).
+
+## Limitations
+
+- This is an offline benchmark. It does not evaluate closed-loop user control.
+- MC_Maze is public macaque data. It is not human clinical BCI data.
+- The sequence models are compact reference implementations. They are not tuned production models.
+- Cross-session generalization, adaptive recalibration, and foundation-model pretraining are future work.
 
 ## Repository structure
 

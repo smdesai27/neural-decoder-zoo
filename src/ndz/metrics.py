@@ -1,8 +1,4 @@
-"""Evaluation metrics for neural decoding.
-
-Beyond accuracy, BCI cares about inference latency, robustness to channel loss,
-and calibration-data efficiency — so those live here too.
-"""
+"""Evaluation metrics for neural decoding."""
 
 from __future__ import annotations
 

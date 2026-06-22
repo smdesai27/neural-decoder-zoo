@@ -102,8 +102,7 @@ def run_robustness(dataset: str, test_frac: float, out_dir: Path, **load_kwargs)
     print(f"naive activity score   clean={clean['activity']:.2f}  +artifact={art['activity']:.2f}  "
           f"(x{art['activity']/clean['activity']:.1f})")
     print(f"behavior-tied R2       clean={clean['r2']:.3f}  +artifact={art['r2']:.3f}")
-    print("Lesson: artifact inflates the magnitude metric but not behavior-tied R2 — "
-          "validate against behavior, not signal size.")
+    print("Artifact increases the magnitude metric. Behavior-tied R2 drops.")
 
     out_dir.mkdir(parents=True, exist_ok=True)
     fig, ax = plt.subplots(1, 2, figsize=(12, 4.2))
@@ -220,7 +219,7 @@ def main() -> None:
     args = ap.parse_args()
 
     if not HAS_TORCH and not args.no_torch:
-        print("[note] PyTorch not installed — running linear + Kalman only "
+        print("[note] PyTorch not installed. Running linear + Kalman only "
               "(install with `pip install -e \".[torch]\"` for the full zoo).")
 
     load_kwargs = {"nwb_path": args.nwb_path} if args.nwb_path else {}

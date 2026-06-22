@@ -1,9 +1,8 @@
 """Deployment-oriented experiments: calibration efficiency, nonstationarity,
 and a simple closed-loop-style cursor simulation.
 
-These probe the things a real BCI cares about beyond a single accuracy number:
-how much calibration data you need, how fast performance decays after
-calibration, and how a decoded velocity actually drives a cursor.
+These probes measure calibration data requirements, post-calibration drift, and
+open-loop cursor drift.
 """
 
 from __future__ import annotations
@@ -19,8 +18,8 @@ def calibration_curve(make_decoder, ds: NeuralDataset,
                       minutes=(0.5, 1, 2, 4, 8, 16), test_frac: float = 0.25):
     """R^2 on a fixed held-out tail vs amount of (most-recent) calibration data.
 
-    Mirrors a real session: a fixed block is the 'use' period; we train on the
-    last m minutes immediately before it. Shows the calibration burden.
+    A fixed block is the use period. The model trains on the last m minutes
+    immediately before it.
     """
     n = ds.n_timepoints
     cut = int(round(n * (1.0 - test_frac)))
@@ -42,11 +41,10 @@ def calibration_curve(make_decoder, ds: NeuralDataset,
 
 def nonstationarity_curve(make_decoder, ds: NeuralDataset,
                           train_frac: float = 0.4, n_windows: int = 8):
-    """R^2 in successive windows after calibration -> performance decay over time.
+    """R^2 in successive windows after calibration.
 
     Train once on an early block, then evaluate in equal windows marching forward
-    through the rest of the session. A downward slope is drift / nonstationarity:
-    the brain's signal statistics shift away from what the decoder was calibrated on.
+    through the rest of the session.
     """
     n = ds.n_timepoints
     cut = int(round(n * train_frac))
@@ -68,10 +66,8 @@ def nonstationarity_curve(make_decoder, ds: NeuralDataset,
 def cursor_simulation(decoder, ds: NeuralDataset, test_frac: float = 0.25):
     """Integrate decoded vs true velocity into 2-D cursor paths.
 
-    Open-loop trajectory reconstruction: drive a cursor with the decoder's
-    velocity output and compare its integrated path to the path the true velocity
-    would trace. Quantifies the offline->trajectory gap (a real closed loop adds a
-    user adapting in real time, which this does not simulate).
+    This is an offline trajectory reconstruction. It does not simulate a user
+    adapting in real time.
     """
     sp = temporal_split(ds, test_frac)
     decoder.fit(sp.X_train, sp.Y_train)

@@ -2,7 +2,7 @@
 
 A `NeuralDataset` is the single object every decoder and metric consumes, so
 swapping a synthetic generator for a real public dataset changes nothing
-downstream. All data here is synthetic or from public sources — no PHI.
+downstream. All data here is synthetic or from public sources. No PHI.
 """
 
 from __future__ import annotations

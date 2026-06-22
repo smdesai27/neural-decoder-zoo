@@ -1,10 +1,7 @@
-"""Robustness + signal-validity probes.
+"""Robustness and signal-validity probes.
 
-This module is the bridge from a prior lesson (analyzing intracranial
-stimulation data, where artifact masqueraded as signal) to good decoding
-practice: a metric that rewards raw signal *magnitude* is easily fooled by
-artifact, whereas a metric tied to *behavior* is not. The demo here shows that
-explicitly by injecting saturating "stim-like" artifact.
+Magnitude metrics can increase under stimulation artifact. Behavior-tied
+metrics should not improve when the artifact carries no behavioral information.
 """
 
 from __future__ import annotations
@@ -30,9 +27,8 @@ def inject_stim_artifact(
 ) -> np.ndarray:
     """Add periodic saturating transients to mimic stimulation artifact.
 
-    Large, channel-wide, short events — exactly the kind of structured artifact
-    that inflates variance/peak-based "responsiveness" without carrying any
-    behavior-predictive information.
+    The injected events are short and channel-wide. They inflate peak-based
+    activity metrics without adding behavior-predictive information.
     """
     rng = np.random.default_rng(seed)
     Xa = X.copy()
@@ -46,11 +42,10 @@ def inject_stim_artifact(
 
 
 def naive_activity_score(X: np.ndarray) -> float:
-    """A tempting-but-fragile 'responsiveness' proxy: peak deflection magnitude
-    (mean over channels of max |x - channel mean|).
+    """Peak-deflection activity score.
 
-    It rewards raw signal *size*, so a few large artifact transients inflate it
-    regardless of behavioral relevance — the exact trap this repo warns against.
+    This is included as a failure case. A few large artifact transients inflate
+    it regardless of behavioral relevance.
     """
     dev = np.abs(X - X.mean(0))
     return float(np.mean(dev.max(axis=0)))
