@@ -10,7 +10,8 @@ per-subject scores and the name of the script that produced them.
 
 `_fixture/` is a **synthetic** example used by the tests. It contains no real
 data and is skipped when the real-data figure is drawn. Any directory whose
-name starts with `_` is skipped the same way.
+name starts with `_` is skipped the same way. `_fixture/make_fixture.py`
+regenerates it, and a test checks that the committed file matches.
 
 Load and plot:
 

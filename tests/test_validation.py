@@ -1,6 +1,7 @@
 """Validation-protocol tests: no leakage, the three synthetic regimes, the case-study schema, the plot."""
 
 import copy
+import importlib.util
 import json
 from pathlib import Path
 
@@ -226,6 +227,41 @@ def test_fixture_is_valid_and_labelled_synthetic():
                                              "held_out_subject"}  # a protocol may be missing
     assert any(r["ci_low"] is None for r in main)  # CI fields may be null
     assert any(r["variant"] == "ridge_alpha_1000" for r in rows)
+
+
+def _close(a, b, tol=2e-4):
+    """Same structure and values. The fixture stores four decimals, so a number may differ in
+    its last digit on another platform."""
+    numeric = (int, float)
+    if isinstance(a, numeric) and isinstance(b, numeric) and not isinstance(a, bool) and not isinstance(b, bool):
+        return abs(a - b) <= tol
+    if isinstance(a, dict) and isinstance(b, dict):
+        return a.keys() == b.keys() and all(_close(a[k], b[k], tol) for k in a)
+    if isinstance(a, list) and isinstance(b, list):
+        return len(a) == len(b) and all(_close(x, y, tol) for x, y in zip(a, b))
+    return a == b
+
+
+def test_fixture_matches_its_generator():
+    spec = importlib.util.spec_from_file_location("make_fixture", FIXTURE.with_name("make_fixture.py"))
+    assert spec is not None and spec.loader is not None
+    make_fixture = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(make_fixture)
+    committed = json.load(open(FIXTURE))
+    assert committed["script"] == make_fixture.SCRIPT
+    built = json.loads(json.dumps(make_fixture.build(generated=committed["generated"])))
+    assert _close(built, committed)
+
+
+def test_close_notices_a_changed_score_and_a_missing_field():
+    committed = json.load(open(FIXTURE))
+    changed = copy.deepcopy(committed)
+    changed["protocols"][0]["score"] += 0.001
+    assert not _close(changed, committed)
+    missing = copy.deepcopy(committed)
+    del missing["protocols"][0]["skipped"]
+    assert not _close(missing, committed)
+    assert _close(copy.deepcopy(committed), committed)
 
 
 def test_variants_may_be_absent():

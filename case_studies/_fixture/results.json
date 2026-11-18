@@ -98,7 +98,7 @@
     "To exercise optional fields in the schema, the main pipeline leaves out held_out_recording and has its purged_random confidence interval set to null; the variant has all five protocols."
   ],
   "generated": "2026-11-18",
-  "script": "ndz.validation.synthetic + ndz.validation.gap (see notes)",
+  "script": "case_studies/_fixture/make_fixture.py",
   "variants": [
     {
       "name": "ridge_alpha_1000",

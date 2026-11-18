@@ -1,4 +1,4 @@
-"""Operator acceptance tests for ndz.validation.
+"""Acceptance tests for ndz.validation.
 
 Part 1 checks the split generators against brute-force definitions on awkward input:
 uneven recordings, non-integer time, shuffled sample order, recording ids reused across subjects.
