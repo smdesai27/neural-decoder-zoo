@@ -15,11 +15,13 @@ Subject mapping
 The subject-specific part also carries a slowly drifting, recording-specific
 channel offset (electrode drift, impedance change, posture). It is scaled by
 ``sqrt(1 - w)``, like the subject-specific mapping, so a fully shared mapping
-has no drift. A slow target plus slow channel drift is what lets random slices
-look better than they are. A decoder trained on random samples has seen the
-same stretch of drift as its test samples, so a chance correlation between
-drift and target within a recording holds on the test set too. It does not
-hold on a later block or on another recording.
+has no drift. Slow channel drift alone opens a small gap between random slices
+and time blocks, even with a white-noise target (about +0.06 in Pearson r on
+average over seeds 0-19, and none with ``drift_scale=0``). A slow target on top
+makes the gap larger (about +0.18). A plausible reason is that a decoder trained
+on random samples has seen the same stretch of drift as its test samples, while
+a later block or another recording shows it drift it has not seen. See
+docs/VALIDATION.md.
 
 Everything is deterministic given ``seed``.
 """

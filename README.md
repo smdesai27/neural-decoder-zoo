@@ -118,7 +118,7 @@ The repository includes four additional BCI-oriented checks.
 
 ## Validation protocols: how the split decides the score
 
-The same decoder can look good or poor depending on how test data is separated from training data. `ndz.validation` scores one decoder under five protocols: random slices, purged random, blocked in time, held-out recording and held-out subject. It reports per-subject scores and subject-bootstrap CIs. On synthetic data with a slow target and individual mappings, random slices report r = 0.73 while a new subject gets 0.16. Write-up, protocols and real-data case studies (pending): [docs/VALIDATION.md](docs/VALIDATION.md). No download needed:
+The same decoder can look good or poor depending on how test data is separated from training data. `ndz.validation` scores one decoder under five protocols: random slices, purged random, blocked in time, held-out recording and held-out subject. It reports per-subject scores and subject-bootstrap CIs. On synthetic data with a slow target and individual mappings, random slices report r = 0.72 while a new subject gets 0.16. Write-up, protocols and real-data case studies (pending): [docs/VALIDATION.md](docs/VALIDATION.md). No download needed:
 
 ```bash
 python -m ndz.validation.demo    # table + docs/validation_gap_synthetic.png

@@ -58,8 +58,10 @@ A protocol result:
 | `score` | number | |
 | `ci_low`, `ci_high` | number or `null` | |
 | `ci_method` | string or `null` | e.g. "percentile bootstrap over subjects" |
-| `per_subject` | `{subject_id: score}` | |
-| `n_test_samples` | int | |
+| `per_subject` | `{subject_id: score}` | one score per scored subject, pooled over that subject's out-of-fold predictions |
+| `n_subjects_scored` | int, optional | number of subjects in `per_subject` |
+| `skipped` | `{subject_id: reason}`, optional | subjects left out of the mean: not tested by the protocol (`held_out_recording` tests only subjects with two or more recordings) or score undefined |
+| `n_test_samples` | int | rows tested; fewer than all rows when the protocol does not test some subjects |
 
 `ndz.validation.gap.to_results_json` turns a `validation_gap` result into this
 shape. `ndz.validation.case_studies.validate_results` lists every problem with
