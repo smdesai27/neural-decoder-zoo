@@ -24,7 +24,12 @@ dist/
 venv/
 env/
 .pytest_cache/
+.ruff_cache/
+.mypy_cache/
 .ipynb_checkpoints/
+
+# --- local scratch (throwaway scripts and sweep output; never committed) ---
+.scratch/
 
 # --- os/editor ---
 .DS_Store
