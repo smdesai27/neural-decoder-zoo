@@ -69,6 +69,13 @@ def _check_protocols(protocols: Any, where: str, errs: list[str]) -> None:
         if not isinstance(ps, dict) or not all(isinstance(k, str) and (_num(v) or v is None)
                                                for k, v in ps.items()):
             errs.append(f"{w}.per_subject: must map subject id -> number")
+        nss = p.get("n_subjects_scored")  # optional
+        if nss is not None and not (isinstance(nss, int) and not isinstance(nss, bool) and nss >= 0):
+            errs.append(f"{w}.n_subjects_scored: must be a non-negative integer when present")
+        sk = p.get("skipped")  # optional
+        if sk is not None and not (isinstance(sk, dict) and all(isinstance(k, str) and isinstance(v, str)
+                                                                for k, v in sk.items())):
+            errs.append(f"{w}.skipped: must map subject id -> reason when present")
         n = p.get("n_test_samples")
         if not (isinstance(n, int) and not isinstance(n, bool) and n >= 0):
             errs.append(f"{w}.n_test_samples: must be a non-negative integer")
@@ -167,6 +174,7 @@ def to_rows(obj: dict, source_path: str = "") -> list[dict]:
                          "score": float(p["score"]), "ci_low": p.get("ci_low"), "ci_high": p.get("ci_high"),
                          "ci_method": p.get("ci_method"),
                          "per_subject": {k: v for k, v in p["per_subject"].items() if v is not None},
+                         "n_subjects_scored": p.get("n_subjects_scored"), "skipped": p.get("skipped") or {},
                          "n_test_samples": p["n_test_samples"]})
     return rows
 

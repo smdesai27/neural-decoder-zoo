@@ -8,6 +8,11 @@ Recording ids are scoped by subject: ``("S1", "R0")`` and ``("S2", "R0")`` are
 different recordings, so callers may reuse ids such as ``"session1"`` across
 subjects.
 
+By default ``random_slices``, ``purged_random``, ``blocked_in_time`` and
+``held_out_subject`` each test every sample exactly once, so their scores
+differ only in what the training set contained. ``held_out_recording`` tests
+only subjects with two or more recordings.
+
 Protocols, from most optimistic to most honest:
 
 - ``random_slices``: shuffled samples, ignoring all structure (the usual check).
@@ -66,28 +71,38 @@ def _finish(train_mask: np.ndarray, test_mask: np.ndarray) -> Split:
     return np.flatnonzero(train_mask & ~test_mask), np.flatnonzero(test_mask)
 
 
-def random_slices(subject, recording, t, n_splits: int = 5, test_frac: float = 0.2,
-                  seed: int = 0) -> list[Split]:
-    """Repeated shuffled splits: each fold draws ``test_frac`` of all samples at random."""
+def random_slices(subject, recording, t, n_splits: int = 5, seed: int = 0,
+                  test_frac: float | None = None) -> list[Split]:
+    """Shuffled K-fold: the samples are permuted and cut into ``n_splits`` folds, so every sample
+    is tested exactly once. Opt-in repeated draws: pass ``test_frac`` to draw ``n_splits``
+    independent random test sets of that size instead (samples can repeat across folds)."""
     subject, rec_key, t = _arrays(subject, recording, t)
     n = len(t)
+    if n_splits < 2 and test_frac is None:
+        raise ValueError("n_splits must be at least 2")
     rng = np.random.default_rng(seed)
-    n_test = max(1, int(round(test_frac * n)))
+    if test_frac is None:
+        folds = np.array_split(rng.permutation(n), n_splits)
+    else:
+        n_test = max(1, int(round(test_frac * n)))
+        folds = [rng.choice(n, n_test, replace=False) for _ in range(n_splits)]
     out = []
-    for _ in range(n_splits):
+    for idx in folds:
         test = np.zeros(n, bool)
-        test[rng.choice(n, n_test, replace=False)] = True
+        test[idx] = True
         out.append(_finish(~test, test))
     return out
 
 
-def purged_random(subject, recording, t, n_splits: int = 5, test_frac: float = 0.1,
-                  embargo: float = 3, seed: int = 0) -> list[Split]:
-    """Random test samples; training samples within ``embargo`` steps of a test sample in the
-    same recording are removed (|t_train - t_test| <= embargo)."""
+def purged_random(subject, recording, t, n_splits: int = 10, embargo: float = 3, seed: int = 0,
+                  test_frac: float | None = None) -> list[Split]:
+    """``random_slices`` folds (by default a shuffled K-fold partition, every sample tested once),
+    with training samples within ``embargo`` steps of a test sample in the same recording removed
+    (|t_train - t_test| <= embargo). The default uses 10 folds, so a fold's purge leaves a usable
+    training set."""
     subject, rec_key, t = _arrays(subject, recording, t)
     out = []
-    for train, test in random_slices(subject, recording, t, n_splits, test_frac, seed):
+    for train, test in random_slices(subject, recording, t, n_splits, seed, test_frac):
         test_mask = np.zeros(len(t), bool)
         test_mask[test] = True
         train_mask = _purge(~test_mask, test_mask, rec_key, t, embargo)

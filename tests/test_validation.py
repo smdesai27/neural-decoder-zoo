@@ -158,8 +158,9 @@ def _scores(regime, seed):
     return {k: v["score"] for k, v in g["protocols"].items()}, g["optimism"]
 
 
-# Margins checked over seeds 0-19: random - blocked >= 0.158, blocked - held-out subject >= 0.053,
-# white-noise |random - blocked| <= 0.043, shared |held-out subject - random| <= 0.004.
+# Margins checked over seeds 0-19 with the current scoring (Ridge alpha=1, Pearson r):
+# random - blocked >= 0.105, blocked - held-out subject >= 0.123, optimism >= 0.288 (regime 1);
+# |held-out subject - random| <= 0.0010 (regime 3).
 @pytest.mark.parametrize("seed", [0, 1, 2])
 def test_slow_target_and_subject_mapping_order_the_protocols(seed):
     s, optimism = _scores("slow_target_subject_specific", seed)
@@ -168,10 +169,35 @@ def test_slow_target_and_subject_mapping_order_the_protocols(seed):
     assert optimism > 0.15
 
 
-@pytest.mark.parametrize("seed", [0, 1, 2])
-def test_white_noise_target_random_matches_blocked(seed):
-    s, _ = _scores("white_noise_target", seed)
-    assert abs(s["random_slices"] - s["blocked_in_time"]) < 0.06
+# White-noise target (regime 2). Time carries no information about the target, but a small
+# random-vs-blocked gap remains, and it comes from the slow channel drift, not from the scoring.
+# Seeds 0-19, Ridge alpha=1, Pearson r, random_slices vs blocked_in_time:
+#   drift_scale=0.0: random 0.807, blocked 0.807, gap in [-0.0012, +0.0016]  (max |gap| 0.0016)
+#   drift_scale=2.5: random 0.641, blocked 0.583, gap in [+0.040, +0.074], mean +0.059
+# Drift lowers both scores (on every seed); it lowers blocked more (-0.224) than random (-0.165).
+WHITE_NOISE_SEEDS = range(20)
+NO_DRIFT_MAX_GAP = 0.005       # observed max 0.0016 (3x headroom)
+DRIFT_GAP_RANGE = (0.02, 0.10)  # observed 0.040 to 0.074 (2x headroom below, 1.35x above)
+
+
+def _white_noise_scores(seed, **overrides):
+    d = make_multisubject(seed=seed, **{**REGIMES["white_noise_target"], **overrides})
+    g = validation_gap(d.X, d.y, d.subject, d.recording, d.t, lambda: Ridge(alpha=1.0),
+                       protocols=["random_slices", "blocked_in_time"], metric="pearson_r", n_boot=10)
+    return g["protocols"]["random_slices"]["score"], g["protocols"]["blocked_in_time"]["score"]
+
+
+@pytest.mark.parametrize("seed", WHITE_NOISE_SEEDS)
+def test_white_noise_target_without_drift_random_matches_blocked(seed):
+    random, blocked = _white_noise_scores(seed, drift_scale=0.0)
+    assert abs(random - blocked) < NO_DRIFT_MAX_GAP
+
+
+@pytest.mark.parametrize("seed", WHITE_NOISE_SEEDS)
+def test_white_noise_target_with_default_drift_leaves_a_small_gap(seed):
+    assert make_multisubject(seed=seed, n_samples=3).params["drift_scale"] == 2.5  # the default
+    random, blocked = _white_noise_scores(seed)  # default drift
+    assert DRIFT_GAP_RANGE[0] < random - blocked < DRIFT_GAP_RANGE[1]
 
 
 @pytest.mark.parametrize("seed", [0, 1, 2])
